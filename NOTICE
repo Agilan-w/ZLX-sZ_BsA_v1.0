@@ -1,0 +1,19 @@
+Zoul AI Decision Engine
+Copyright 2026 Studio Zoul
+
+This product includes software developed by:
+
+  - Convai Innovations (https://convaiinnovations.com)
+    Original "Laya" model and RLCD training methodology.
+    Copyright 2026 Nandakishor Mukkunnoth / Convai Innovations.
+    Licensed under the Apache License, Version 2.0.
+
+  - Answer.AI, LightOn, and collaborators
+    ModernBERT architecture (ModernBERT-large encoder).
+    See: https://huggingface.co/answerdotai/ModernBERT-large
+    Licensed under the Apache License, Version 2.0.
+
+This software is an independent derivative work. "Zoul AI Decision Engine"
+does not claim endorsement from, or affiliation with, the original Laya
+or ModernBERT creators. "Laya" is a trademark of Convai Innovations and
+is used here solely to identify the upstream model.
