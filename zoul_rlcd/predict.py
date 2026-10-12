@@ -81,8 +81,16 @@ class DecisionEngine:
             self.device = torch.device(device)
 
         logger.info("Initializing DecisionEngine on device: %s", self.device)
-        logger.info("Loading tokenizer from '%s'...", self.model_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+        except Exception:
+            from transformers import PreTrainedTokenizerFast
+
+            tok_json = Path(self.model_path) / "tokenizer.json"
+            if tok_json.exists():
+                self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tok_json))
+            else:
+                raise
 
         logger.info("Loading model weights from '%s'...", self.model_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(

@@ -371,7 +371,16 @@ def evaluate(args: argparse.Namespace) -> None:
 
     # 1. Load Tokenizer & Model
     logger.info("Loading checkpoint from '%s'...", args.model_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    except Exception:
+        from transformers import PreTrainedTokenizerFast
+
+        tok_json = Path(args.model_path) / "tokenizer.json"
+        if tok_json.exists():
+            tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tok_json))
+        else:
+            raise
     model = AutoModelForSequenceClassification.from_pretrained(args.model_path)
     model.to(device)
     model.eval()

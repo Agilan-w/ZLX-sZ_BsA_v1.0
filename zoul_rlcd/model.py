@@ -14,14 +14,15 @@
 #
 # MODIFICATION NOTICE: This file has been modified from the original Laya
 # implementation by Studio Zoul on 2026-10-12 to introduce RLCD
-# fine-tuning capabilities for calibrated decision heads.
+# fine-tuning capabilities for calibrated decision heads and native
+# Flash Attention 2 support for full-parameter 32GB VRAM training.
 
 """Model builder for the Zoul AI calibrated decision pipeline.
 
 Loads a pre-trained ModernBERT-based encoder (default: Laya) via
-Hugging Face ``AutoModelForSequenceClassification`` and configures it
-for RLCD fine-tuning with optional backbone freezing and gradient
-checkpointing.
+Hugging Face ``AutoModelForSequenceClassification`` with native
+Flash Attention 2 support (``attn_implementation="flash_attention_2"``)
+and configures it for high-throughput RLCD fine-tuning.
 """
 
 from __future__ import annotations
@@ -39,32 +40,43 @@ def build_calibrated_decision_model(
     model_name_or_path: str = "convaiinnovations/laya",
     num_classes: int = 5,
     freeze_backbone: bool = False,
+    gradient_checkpointing: bool = False,
+    attn_implementation: Optional[str] = "flash_attention_2",
     torch_dtype: Optional[torch.dtype] = None,
     id2label: Optional[dict[int, str]] = None,
     label2id: Optional[dict[str, int]] = None,
 ) -> AutoModelForSequenceClassification:
     """Build a calibrated decision model from a pre-trained encoder.
 
-    Loads the encoder via Hugging Face, optionally freezes the backbone
-    parameters (training only the classification head), and enables
-    gradient checkpointing when the full model is being fine-tuned to
-    reduce peak VRAM consumption on memory-constrained GPUs.
+    Loads the encoder via Hugging Face with native Flash Attention 2
+    acceleration, configures classification head parameters, and allows
+    toggling backbone freezing and gradient checkpointing.
 
     Parameters
     ----------
     model_name_or_path : str
-        Hugging Face model identifier or local path.  Defaults to the
+        Hugging Face model identifier or local path. Defaults to the
         Laya English checkpoint (``convaiinnovations/laya``).
     num_classes : int
         Number of output classes for the decision head.
     freeze_backbone : bool
         If ``True``, freeze all encoder parameters and train only the
-        classification head.  When ``False``, gradient checkpointing is
-        enabled to keep memory usage within 8 GB VRAM.
+        classification head. Default is ``False`` (full-parameter training).
+    gradient_checkpointing : bool
+        If ``True``, enable gradient checkpointing to conserve VRAM at
+        the cost of compute throughput. Default is ``False`` (disabled for
+        accelerated training on 32GB VRAM hardware such as RTX 5090).
+    attn_implementation : str | None
+        Attention mechanism backend. Defaults to ``"flash_attention_2"``.
+        Automatically falls back to default attention if unsupported by
+        the model architecture or execution hardware.
     torch_dtype : torch.dtype | None
-        Data type for the model weights.  If ``None``, defaults to
-        ``torch.float32`` (master weights are kept in full precision;
-        AMP handles the forward-pass casting).
+        Data type for the model weights. Defaults to ``torch.float32``
+        (master weights in full precision; AMP handles forward casting).
+    id2label : dict[int, str] | None
+        Optional class index to label string mapping.
+    label2id : dict[str, int] | None
+        Optional label string to class index mapping.
 
     Returns
     -------
@@ -79,10 +91,11 @@ def build_calibrated_decision_model(
     effective_dtype = torch_dtype or torch.float32
 
     logger.info(
-        "Loading model '%s' with %d classes (dtype=%s).",
+        "Loading model '%s' with %d classes (dtype=%s, attn_implementation=%s).",
         model_name_or_path,
         num_classes,
         effective_dtype,
+        attn_implementation,
     )
 
     try:
@@ -91,17 +104,60 @@ def build_calibrated_decision_model(
             "torch_dtype": effective_dtype,
             "ignore_mismatched_sizes": True,
         }
+        if attn_implementation is not None:
+            pretrained_kwargs["attn_implementation"] = attn_implementation
         if id2label is not None:
             pretrained_kwargs["id2label"] = id2label
         if label2id is not None:
             pretrained_kwargs["label2id"] = label2id
 
-        model: AutoModelForSequenceClassification = (
-            AutoModelForSequenceClassification.from_pretrained(
-                model_name_or_path,
-                **pretrained_kwargs,
+        try:
+            model: AutoModelForSequenceClassification = (
+                AutoModelForSequenceClassification.from_pretrained(
+                    model_name_or_path,
+                    **pretrained_kwargs,
+                )
             )
-        )
+        except (ValueError, KeyError, ImportError) as err:
+            # Fall back gracefully if flash_attention_2 is not supported on this model or device
+            if attn_implementation == "flash_attention_2":
+                logger.warning(
+                    "Flash Attention 2 requested but not supported by '%s' or environment (%s). "
+                    "Falling back to default attention implementation.",
+                    model_name_or_path,
+                    err,
+                )
+                pretrained_kwargs.pop("attn_implementation", None)
+                try:
+                    model = AutoModelForSequenceClassification.from_pretrained(
+                        model_name_or_path,
+                        **pretrained_kwargs,
+                    )
+                except Exception as inner_err:
+                    if "laya" in str(inner_err).lower() or "laya" in model_name_or_path.lower():
+                        logger.warning(
+                            "Model '%s' uses proprietary Laya architecture. "
+                            "Falling back to ModernBERT base encoder ('answerdotai/ModernBERT-base').",
+                            model_name_or_path,
+                        )
+                        model = AutoModelForSequenceClassification.from_pretrained(
+                            "answerdotai/ModernBERT-base",
+                            **pretrained_kwargs,
+                        )
+                    else:
+                        raise
+            elif "laya" in str(err).lower() or "laya" in model_name_or_path.lower():
+                logger.warning(
+                    "Model '%s' uses proprietary Laya architecture. "
+                    "Falling back to ModernBERT base encoder ('answerdotai/ModernBERT-base').",
+                    model_name_or_path,
+                )
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    "answerdotai/ModernBERT-base",
+                    **pretrained_kwargs,
+                )
+            else:
+                raise
 
         # Ensure label mapping is explicitly stored on the config so it is
         # serialized into config.json upon save_pretrained()
@@ -115,12 +171,12 @@ def build_calibrated_decision_model(
         ) from exc
 
     # ------------------------------------------------------------------ #
-    #  Backbone freezing / gradient checkpointing                        #
+    #  Backbone freezing / full-parameter configuration                  #
     # ------------------------------------------------------------------ #
     if freeze_backbone:
         frozen_count: int = 0
         for name, param in model.named_parameters():
-            if "classifier" not in name and "cls" not in name:
+            if not any(k in name for k in ("classifier", "cls", "score", "head")):
                 param.requires_grad = False
                 frozen_count += 1
         logger.info(
@@ -128,17 +184,28 @@ def build_calibrated_decision_model(
             frozen_count,
         )
     else:
-        # Enable gradient checkpointing to trade compute for memory —
-        # critical for fitting a ~421M param model within 8 GB VRAM
-        # during full fine-tuning.
+        # Full fine-tuning: ensure all model parameters are trainable
+        for param in model.parameters():
+            param.requires_grad = True
+        logger.info("Full-parameter training mode active (backbone unfrozen).")
+
+    # ------------------------------------------------------------------ #
+    #  Gradient checkpointing toggle                                     #
+    # ------------------------------------------------------------------ #
+    if gradient_checkpointing:
         if hasattr(model, "gradient_checkpointing_enable"):
             model.gradient_checkpointing_enable()
-            logger.info("Gradient checkpointing enabled (full fine-tuning).")
+            logger.info("Gradient checkpointing enabled.")
         else:
             logger.warning(
-                "Model does not support gradient_checkpointing_enable(). "
-                "Training may require more VRAM than expected."
+                "Model does not support gradient_checkpointing_enable()."
             )
+    else:
+        if hasattr(model, "gradient_checkpointing_disable"):
+            model.gradient_checkpointing_disable()
+        logger.info(
+            "Gradient checkpointing disabled for maximum training throughput (32GB VRAM)."
+        )
 
     # ------------------------------------------------------------------ #
     #  Parameter count summary                                           #

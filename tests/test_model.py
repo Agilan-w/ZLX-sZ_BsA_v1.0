@@ -72,19 +72,29 @@ class TestModelArchitectureAndFreezing:
         assert trainable_count == total_count
         assert all(p.requires_grad for p in model.parameters())
 
-    def test_gradient_checkpointing_enabled_on_full_finetuning(self, model_name: str):
-        """Gradient checkpointing must be enabled when freeze_backbone=False to conserve VRAM."""
-        model = build_calibrated_decision_model(
+    def test_gradient_checkpointing_toggle(self, model_name: str):
+        """Gradient checkpointing can be toggled on or off."""
+        model_enabled = build_calibrated_decision_model(
             model_name_or_path=model_name,
             num_classes=3,
             freeze_backbone=False,
+            gradient_checkpointing=True,
         )
-
-        # Check if gradient checkpointing is activated on the underlying transformer
-        is_gc_enabled = getattr(model, "is_gradient_checkpointing", False) or getattr(
-            model.base_model, "gradient_checkpointing", False
+        is_gc_enabled = getattr(model_enabled, "is_gradient_checkpointing", False) or getattr(
+            model_enabled.base_model, "gradient_checkpointing", False
         )
         assert is_gc_enabled is True
+
+        model_disabled = build_calibrated_decision_model(
+            model_name_or_path=model_name,
+            num_classes=3,
+            freeze_backbone=False,
+            gradient_checkpointing=False,
+        )
+        is_gc_disabled = getattr(model_disabled, "is_gradient_checkpointing", False) or getattr(
+            model_disabled.base_model, "gradient_checkpointing", False
+        )
+        assert is_gc_disabled is False
 
     def test_id2label_and_label2id_injection(self, model_name: str):
         """Custom label mappings must be injected into model.config for serialization."""

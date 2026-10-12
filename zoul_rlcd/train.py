@@ -14,21 +14,30 @@
 #
 # MODIFICATION NOTICE: This file has been modified from the original Laya
 # implementation by Studio Zoul on 2026-10-12 to introduce RLCD
-# fine-tuning capabilities for calibrated decision heads.
+# fine-tuning capabilities for calibrated decision heads, differential
+# learning rates, native Weights & Biases (wandb) logging, and high-throughput
+# 32GB VRAM optimization (RTX 5090).
 
 """RLCD training orchestrator for the Zoul AI Decision Engine.
 
-Manages the full training and validation lifecycle with:
+Manages the full training and validation lifecycle optimized for full-parameter
+training on 32GB VRAM hardware (such as RTX 5090):
 
-- PyTorch AMP (BF16 where supported, FP16 fallback) + GradScaler
-- Gradient accumulation for effective large-batch training on 8 GB VRAM
-- Gradient checkpointing during full fine-tuning
-- Best-checkpoint saving guarded by ECE improvement **and** accuracy
-  stability (prevents saving a well-calibrated but degenerate model)
+- Native Flash Attention 2 acceleration
+- Differential learning rates (AdamW: 1e-5 backbone, 1e-4 classification head)
+- Gradient checkpointing disabled by default for maximum throughput
+- Batch size 32 with max sequence length 1024
+- Weights & Biases (wandb) experiment tracking (Train Loss, Val Loss, Acc, ECE)
+- PyTorch AMP (BF16 auto-detected on modern hardware)
+- Guarded checkpoint saving on ECE improvement and accuracy stability
 
 Usage::
 
-    python -m zoul_rlcd.train --epochs 10 --batch_size 4 --lambda_cal 0.5
+    python -m zoul_rlcd.train \
+        --data_path data/decisions.csv \
+        --batch_size 32 \
+        --max_length 1024 \
+        --use_wandb
 """
 
 from __future__ import annotations
@@ -73,7 +82,7 @@ def _select_amp_dtype() -> torch.dtype:
 
 
 # --------------------------------------------------------------------------- #
-#  CLI                                                                         #
+#  CLI Argument Parser                                                         #
 # --------------------------------------------------------------------------- #
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
@@ -81,11 +90,11 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         prog="zoul_rlcd.train",
         description=(
             "Zoul AI Decision Engine -- RLCD fine-tuning pipeline for "
-            "calibrated decision heads on top of the Laya model."
+            "calibrated decision heads on top of the Laya model (RTX 5090 optimized)."
         ),
     )
 
-    # Model
+    # Model configuration
     parser.add_argument(
         "--model_name_or_path",
         type=str,
@@ -102,28 +111,52 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--freeze_backbone",
         action="store_true",
         default=False,
-        help="Freeze encoder weights; train only the classification head.",
+        help="Freeze encoder weights; train head only (default: False for full-parameter training).",
+    )
+    parser.add_argument(
+        "--gradient_checkpointing",
+        action="store_true",
+        default=False,
+        help="Enable gradient checkpointing (default: False; disabled for maximum 32GB throughput).",
+    )
+    parser.add_argument(
+        "--attn_implementation",
+        type=str,
+        default="flash_attention_2",
+        help="Attention implementation (default: flash_attention_2).",
     )
 
-    # Training
+    # Training parameters
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=4,
-        help="Micro-batch size per forward pass (default: 4).",
+        default=32,
+        help="Micro-batch size per forward pass (default: 32).",
     )
     parser.add_argument(
         "--grad_accum_steps",
         type=int,
-        default=8,
-        help="Gradient accumulation steps (effective batch = batch_size * this).",
+        default=1,
+        help="Gradient accumulation steps (default: 1; effective batch = batch_size * grad_accum_steps).",
     )
     parser.add_argument(
-        "--lr",
+        "--lr_backbone",
         type=float,
-        default=2e-5,
-        help="Peak learning rate for AdamW.",
+        default=1e-5,
+        help="Peak learning rate for the ModernBERT encoder backbone (default: 1e-5).",
+    )
+    parser.add_argument(
+        "--lr_head",
+        type=float,
+        default=1e-4,
+        help="Peak learning rate for the classification head (default: 1e-4).",
+    )
+    parser.add_argument(
+        "--weight_decay",
+        type=float,
+        default=0.01,
+        help="Weight decay for AdamW (default: 0.01).",
     )
     parser.add_argument(
         "--lambda_cal",
@@ -138,7 +171,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Max gradient norm for clipping.",
     )
 
-    # Data
+    # Data parameters
     parser.add_argument(
         "--data_path",
         type=str,
@@ -176,8 +209,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--max_length",
         type=int,
-        default=128,
-        help="Maximum sequence length threshold (default: 128).",
+        default=1024,
+        help="Maximum sequence length threshold (default: 1024).",
     )
     parser.add_argument(
         "--val_split",
@@ -186,7 +219,33 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Fraction of data reserved for validation.",
     )
 
-    # Output
+    # Weights & Biases (wandb) experiment tracking
+    parser.add_argument(
+        "--use_wandb",
+        action="store_true",
+        default=False,
+        help="Enable Weights & Biases experiment tracking.",
+    )
+    parser.add_argument(
+        "--wandb_project",
+        type=str,
+        default="zoul-ai-decision-engine",
+        help="Weights & Biases project name (default: zoul-ai-decision-engine).",
+    )
+    parser.add_argument(
+        "--wandb_run_name",
+        type=str,
+        default=None,
+        help="Optional run name for Weights & Biases.",
+    )
+    parser.add_argument(
+        "--wandb_entity",
+        type=str,
+        default=None,
+        help="Optional entity/team for Weights & Biases.",
+    )
+
+    # Output & Checkpoints
     parser.add_argument(
         "--output_dir",
         type=str,
@@ -194,16 +253,13 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Directory to save the best checkpoint.",
     )
     parser.add_argument("--seed", type=int, default=42)
-
-    # Checkpoint guard
     parser.add_argument(
         "--acc_degradation_tol",
         type=float,
         default=0.05,
         help=(
-            "Maximum allowed drop in validation accuracy (relative to "
-            "the best seen) when saving a checkpoint based on ECE "
-            "improvement.  Set to 0.0 for strict no-degradation."
+            "Maximum allowed drop in validation accuracy relative to "
+            "the best seen when saving a checkpoint based on ECE improvement."
         ),
     )
 
@@ -235,9 +291,7 @@ def _build_dataloaders(
         generator=torch.Generator().manual_seed(args.seed),
     )
 
-    logger.info(
-        "Dataset split -- Train: %d | Val: %d", train_size, val_size
-    )
+    logger.info("Dataset split -- Train: %d | Val: %d", train_size, val_size)
 
     train_loader = DataLoader(
         train_ds,
@@ -248,7 +302,7 @@ def _build_dataloaders(
     )
     val_loader = DataLoader(
         val_ds,
-        batch_size=args.batch_size * 2,  # No gradients → can double
+        batch_size=args.batch_size,
         shuffle=False,
         pin_memory=True,
     )
@@ -276,10 +330,43 @@ def train(args: argparse.Namespace) -> None:
         torch.cuda.manual_seed_all(args.seed)
 
     # ------------------------------------------------------------------ #
+    #  Weights & Biases (wandb) initialization                           #
+    # ------------------------------------------------------------------ #
+    wandb_run = None
+    if args.use_wandb:
+        try:
+            import wandb
+
+            wandb_run = wandb.init(
+                project=args.wandb_project,
+                name=args.wandb_run_name,
+                entity=args.wandb_entity,
+                config=vars(args),
+            )
+            logger.info("Weights & Biases initialized successfully.")
+        except Exception as exc:
+            logger.warning(
+                "Failed to initialize Weights & Biases: %s. Continuing without wandb.",
+                exc,
+            )
+            wandb_run = None
+
+    # ------------------------------------------------------------------ #
     #  Tokenizer (instantiated early so save_pretrained works later)     #
     # ------------------------------------------------------------------ #
     logger.info("Loading tokenizer from '%s'.", args.model_name_or_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    except Exception as exc:
+        if "laya" in args.model_name_or_path.lower():
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    args.model_name_or_path, subfolder="tokenizer"
+                )
+            except Exception:
+                tokenizer = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-base")
+        else:
+            raise
 
     # ------------------------------------------------------------------ #
     #  Data                                                              #
@@ -323,44 +410,83 @@ def train(args: argparse.Namespace) -> None:
         model_name_or_path=args.model_name_or_path,
         num_classes=args.num_classes,
         freeze_backbone=args.freeze_backbone,
+        gradient_checkpointing=args.gradient_checkpointing,
+        attn_implementation=args.attn_implementation,
         id2label=id2label,
         label2id=label2id,
     )
     model.to(device)
 
     # ------------------------------------------------------------------ #
-    #  Loss, optimiser, scaler                                           #
+    #  Loss & Optimizer (Differential Learning Rates)                    #
     # ------------------------------------------------------------------ #
     criterion = RLCDCompoundLoss(lambda_cal=args.lambda_cal)
-    optimizer = AdamW(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=args.lr,
-        weight_decay=0.01,
+
+    backbone_params: list[torch.nn.Parameter] = []
+    head_params: list[torch.nn.Parameter] = []
+
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if any(head_key in name for head_key in ("classifier", "cls", "score", "head")):
+            head_params.append(param)
+        else:
+            backbone_params.append(param)
+
+    optimizer_grouped_parameters = []
+    if backbone_params:
+        optimizer_grouped_parameters.append(
+            {
+                "params": backbone_params,
+                "lr": args.lr_backbone,
+                "weight_decay": args.weight_decay,
+            }
+        )
+    if head_params:
+        optimizer_grouped_parameters.append(
+            {
+                "params": head_params,
+                "lr": args.lr_head,
+                "weight_decay": args.weight_decay,
+            }
+        )
+
+    optimizer = AdamW(optimizer_grouped_parameters)
+
+    logger.info(
+        "Differential LR configured -- Backbone: %d params (lr=%.2e) | "
+        "Head: %d params (lr=%.2e)",
+        sum(p.numel() for p in backbone_params),
+        args.lr_backbone,
+        sum(p.numel() for p in head_params),
+        args.lr_head,
     )
 
     amp_dtype: torch.dtype = _select_amp_dtype()
-    # GradScaler is only needed for float16; bfloat16 doesn't require it
-    # but it is harmless and simplifies the code path.
     scaler = torch.amp.GradScaler("cuda", enabled=torch.cuda.is_available())
 
     # ------------------------------------------------------------------ #
     #  Checkpoint guard state                                            #
     # ------------------------------------------------------------------ #
     best_ece: float = float("inf")
-    best_accuracy: float = 0.0  # Track best accuracy seen so far
+    best_accuracy: float = 0.0
     effective_batch: int = args.batch_size * args.grad_accum_steps
 
     logger.info(
         "Training config -- Epochs: %d | Micro-batch: %d | "
-        "Grad accum: %d | Effective batch: %d | LR: %s | "
-        "Lambda_cal: %s | AMP dtype: %s",
+        "Grad accum: %d | Effective batch: %d | "
+        "LR Backbone: %.2e | LR Head: %.2e | Lambda_cal: %s | "
+        "Gradient Checkpointing: %s | AMP: %s | Wandb: %s",
         args.epochs,
         args.batch_size,
         args.grad_accum_steps,
         effective_batch,
-        args.lr,
+        args.lr_backbone,
+        args.lr_head,
         args.lambda_cal,
+        args.gradient_checkpointing,
         amp_dtype,
+        args.use_wandb,
     )
 
     # ------------------------------------------------------------------ #
@@ -373,7 +499,6 @@ def train(args: argparse.Namespace) -> None:
         optimizer.zero_grad(set_to_none=True)
 
         for step, batch in enumerate(train_loader, start=1):
-            # Move batch to device
             batch = {
                 k: v.to(device, non_blocking=True) for k, v in batch.items()
             }
@@ -388,7 +513,6 @@ def train(args: argparse.Namespace) -> None:
                     attention_mask=batch["attention_mask"],
                 )
                 loss, components = criterion(outputs.logits, batch["labels"])
-                # Scale loss for gradient accumulation
                 loss = loss / args.grad_accum_steps
 
             scaler.scale(loss).backward()
@@ -405,8 +529,7 @@ def train(args: argparse.Namespace) -> None:
 
             epoch_loss += components["total"].item()
 
-        # Handle remaining gradients if the last accumulation window
-        # is incomplete
+        # Handle remaining gradient accumulation step
         if len(train_loader) % args.grad_accum_steps != 0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(
@@ -421,7 +544,7 @@ def train(args: argparse.Namespace) -> None:
             epoch_loss / len(train_loader) if len(train_loader) > 0 else 0.0
         )
         logger.info(
-            "[Epoch %d/%d] Train loss: %.4f (over %d optimiser steps)",
+            "[Epoch %d/%d] Train loss: %.4f (over %d optimizer steps)",
             epoch,
             args.epochs,
             avg_train_loss,
@@ -435,6 +558,7 @@ def train(args: argparse.Namespace) -> None:
         tracker = CalibrationTracker(
             num_classes=args.num_classes, device=str(device)
         )
+        val_loss_total: float = 0.0
 
         with torch.no_grad():
             for batch in val_loader:
@@ -451,27 +575,84 @@ def train(args: argparse.Namespace) -> None:
                         input_ids=batch["input_ids"],
                         attention_mask=batch["attention_mask"],
                     )
+                    v_loss, v_comp = criterion(outputs.logits, batch["labels"])
+                    val_loss_total += v_comp["total"].item()
+
                 # Cast logits to float32 for stable metric computation
                 tracker.update(
                     outputs.logits.float(), batch["labels"]
                 )
 
+        avg_val_loss: float = (
+            val_loss_total / len(val_loader) if len(val_loader) > 0 else 0.0
+        )
         metrics: dict[str, float] = tracker.log_summary(epoch)
+        logger.info(
+            "[Epoch %d/%d] Validation -- Loss: %.4f | Acc: %.4f | F1: %.4f | "
+            "Brier: %.4f | ECE: %.4f",
+            epoch,
+            args.epochs,
+            avg_val_loss,
+            metrics["accuracy"],
+            metrics["macro_f1"],
+            metrics["brier_score"],
+            metrics["ece"],
+        )
+
+        vram_alloc_mb = (
+            torch.cuda.memory_allocated() / (1024 * 1024)
+            if torch.cuda.is_available()
+            else 0.0
+        )
+        vram_res_mb = (
+            torch.cuda.memory_reserved() / (1024 * 1024)
+            if torch.cuda.is_available()
+            else 0.0
+        )
+        vram_max_mb = (
+            torch.cuda.max_memory_allocated() / (1024 * 1024)
+            if torch.cuda.is_available()
+            else 0.0
+        )
+        logger.info(
+            "[Epoch %d/%d] VRAM Usage -- Allocated: %.1f MB | Reserved: %.1f MB | Peak: %.1f MB",
+            epoch,
+            args.epochs,
+            vram_alloc_mb,
+            vram_res_mb,
+            vram_max_mb,
+        )
+
+        # -------------------------------------------------------------- #
+        #  Weights & Biases (wandb) logging                              #
+        # -------------------------------------------------------------- #
+        if wandb_run is not None:
+            import wandb
+
+            wandb.log(
+                {
+                    "epoch": epoch,
+                    "train_loss": avg_train_loss,
+                    "val_loss": avg_val_loss,
+                    "accuracy": metrics["accuracy"],
+                    "macro_f1": metrics["macro_f1"],
+                    "brier_score": metrics["brier_score"],
+                    "ece": metrics["ece"],
+                    "best_ece": min(best_ece, metrics["ece"]),
+                    "vram_allocated_mb": vram_alloc_mb,
+                    "vram_reserved_mb": vram_res_mb,
+                    "vram_peak_mb": vram_max_mb,
+                },
+                step=epoch,
+            )
 
         # -------------------------------------------------------------- #
         #  Guarded checkpoint saving                                     #
-        #                                                                #
-        #  Save only when ECE improves AND validation accuracy has not   #
-        #  degraded beyond the tolerance threshold.  This prevents       #
-        #  saving a model that is "well-calibrated" only because it      #
-        #  has collapsed to near-uniform predictions.                    #
         # -------------------------------------------------------------- #
         current_ece: float = metrics["ece"]
         current_acc: float = metrics["accuracy"]
 
-        # Update the best accuracy watermark
         best_accuracy = max(best_accuracy, current_acc)
-
         ece_improved: bool = current_ece < best_ece
         acc_acceptable: bool = (
             current_acc >= best_accuracy - args.acc_degradation_tol
@@ -482,7 +663,6 @@ def train(args: argparse.Namespace) -> None:
             output_path = Path(args.output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
 
-            # Ensure label mappings are stored in the configuration before saving
             model.config.id2label = id2label
             model.config.label2id = label2id
 
@@ -519,6 +699,9 @@ def train(args: argparse.Namespace) -> None:
             )
 
         tracker.reset()
+
+    if wandb_run is not None:
+        wandb_run.finish()
 
     logger.info("Training complete. Best ECE: %.4f", best_ece)
 

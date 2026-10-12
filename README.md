@@ -100,11 +100,15 @@ Input Tokens → [ModernBERT Encoder] → [Classification Head] → Logits
 |---|---|---|
 | `--model_name_or_path` | `convaiinnovations/laya` | HuggingFace model ID or local path |
 | `--num_classes` | `5` | Number of output classes (auto-detected when using `--data_path`) |
-| `--freeze_backbone` | `False` | Freeze encoder; train head only |
+| `--freeze_backbone` | `False` | Freeze encoder; train head only (default: False for full-parameter training) |
+| `--gradient_checkpointing` | `False` | Enable gradient checkpointing (disabled by default for 32GB VRAM speed) |
+| `--attn_implementation` | `flash_attention_2` | Attention mechanism backend |
 | `--epochs` | `10` | Training epochs |
-| `--batch_size` | `4` | Micro-batch size per forward pass |
-| `--grad_accum_steps` | `8` | Gradient accumulation steps (effective batch = 32) |
-| `--lr` | `2e-5` | Peak learning rate |
+| `--batch_size` | `32` | Micro-batch size per forward pass (RTX 5090 default: 32) |
+| `--grad_accum_steps` | `1` | Gradient accumulation steps (effective batch = batch_size * this) |
+| `--lr_backbone` | `1e-5` | Peak learning rate for ModernBERT backbone |
+| `--lr_head` | `1e-4` | Peak learning rate for classification head |
+| `--weight_decay` | `0.01` | Weight decay for AdamW |
 | `--lambda_cal` | `0.5` | Brier calibration weight |
 | `--max_grad_norm` | `1.0` | Gradient clipping threshold |
 | `--data_path` | `None` | Path to dataset (.csv, .jsonl, .parquet) or Hugging Face Hub dataset ID |
@@ -112,8 +116,11 @@ Input Tokens → [ModernBERT Encoder] → [Classification Head] → Logits
 | `--label_column` | `label` | Column name containing target labels |
 | `--dataset_config` | `None` | Optional sub-configuration name for HF Hub datasets |
 | `--num_samples` | `1000` | Synthetic dataset size (used only when `--data_path` is omitted) |
-| `--max_length` | `128` | Sequence length threshold |
+| `--max_length` | `1024` | Sequence length threshold (RTX 5090 default: 1024) |
 | `--val_split` | `0.2` | Validation split fraction |
+| `--use_wandb` | `False` | Enable Weights & Biases (wandb) experiment tracking |
+| `--wandb_project` | `zoul-ai-decision-engine` | Weights & Biases project name |
+| `--wandb_run_name` | `None` | Optional run name for Weights & Biases |
 | `--output_dir` | `best_calibrated_model` | Checkpoint directory |
 | `--seed` | `42` | Random seed |
 | `--acc_degradation_tol` | `0.05` | Max accuracy drop allowed when saving on ECE improvement |
