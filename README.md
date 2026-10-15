@@ -6,25 +6,22 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)](https://www.python.org)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.2%2B-EE4C2C.svg)](https://pytorch.org)
 
-A production-grade, open-source pipeline for training **calibrated decision heads** on top of the [Laya](https://huggingface.co/convaiinnovations/laya) model (~421M parameter ModernBERT-large encoder) using **Reinforcement Learning for Calibrated Decisions (RLCD)**.
+Pipeline for training **calibrated decision heads** on top of the [Laya](https://huggingface.co/convaiinnovations/laya) model (~421M parameter ModernBERT-large encoder) using **Reinforcement Learning for Calibrated Decisions (RLCD)**.
 
 ---
 
 ## Overview
 
-Standard classifiers optimise for accuracy alone, often producing overconfident or poorly calibrated probability estimates. RLCD addresses this by training with a **compound loss** that combines cross-entropy (for discriminative power) with a **Brier Score** penalty (for calibration):
+Classifiers trained only on cross-entropy often produce overconfident probability estimates. RLCD adds a **Brier Score** penalty to train for calibration alongside classification accuracy:
 
 $$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{CE}} + \lambda_{\text{cal}} \cdot \mathcal{L}_{\text{Brier}}$$
 
-The Brier Score is a strictly proper scoring rule — the model minimises it only when its predicted probabilities match the true data-generating distribution.
+### Features
 
-### Key Features
-
-- **8 GB VRAM optimised** — AMP (BF16/FP16 auto-detection), gradient accumulation, gradient checkpointing
-- **Calibration-first evaluation** — Tracks Accuracy, Macro F1, Brier Score, and Expected Calibration Error (ECE)
-- **Safe checkpointing** — Saves only when ECE improves *and* accuracy remains stable
-- **Modular architecture** — Loss, model, metrics, and data modules are fully decoupled
-- **Apache 2.0 compliant** — Full attribution, modification notices, and NOTICE file
+- Mixed-precision training (BF16 / FP16) and gradient accumulation
+- Tracks Accuracy, Macro F1, Brier Score, and Expected Calibration Error (ECE)
+- Saves checkpoints on ECE improvement without accuracy regression
+- Post-hoc temperature scaling via L-BFGS
 
 ---
 
@@ -178,9 +175,9 @@ python -m zoul_rlcd.evaluate \
 
 ---
 
-## Production Inference & Calibrated Decision Scoring
+## Inference
 
-Use `zoul_rlcd.predict` to serve calibrated decisions either programmatically via the Python API (`DecisionEngine`) or as a standalone CLI tool emitting strictly formatted JSON for downstream webhook tools like n8n or Zapier.
+Run calibrated inference either via Python or through the CLI.
 
 ### Python API (`DecisionEngine`)
 
@@ -223,9 +220,9 @@ If the maximum predicted class probability ($\max_c p_c$) is below `--threshold`
 Otherwise, when $\max_c p_c \ge \text{threshold}$, the status is marked as:
 `"CONFIDENT"`
 
-### Standalone CLI (n8n Webhook Ready)
+### CLI (JSON Output)
 
-All logging is routed strictly to `sys.stderr`, ensuring `sys.stdout` produces only pure, parseable JSON:
+Logging is sent to `stderr` and JSON output to `stdout`:
 
 ```bash
 python -m zoul_rlcd.predict \
@@ -274,9 +271,9 @@ With all optimisations enabled, the ~421M parameter Laya model fits comfortably 
 
 ---
 
-## Testing & Quality Assurance
+## Testing
 
-The repository includes a comprehensive `pytest` suite testing loss mathematical invariants, model parameter freezing, ECE binning edge cases, and inference JSON output:
+Run tests and linter:
 
 ```bash
 # Run linter
@@ -320,7 +317,3 @@ If you use this pipeline in your research, please cite:
     url    = {https://github.com/your-org/zlx-cde-v2.5},
 }
 ```
-
----
-
-*Built with ❤ by Agilan

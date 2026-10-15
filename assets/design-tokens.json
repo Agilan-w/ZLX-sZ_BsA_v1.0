@@ -1,8 +1,8 @@
 {
   "$schema": "https://tr.designtokens.org/format/",
-  "name": "ZLX-CDE V2.5 Brand Design Tokens",
+  "name": "ZLX-CDE V2.5 Tokens",
   "version": "1.0.0",
-  "description": "Obsidian & Crimson 10-Color Enterprise Design System for ZLX-CDE V2.5 Decision Engine",
+  "description": "Color and theme tokens for ZLX-CDE V2.5",
   "primitive": {
     "color": {
       "obsidian": { "value": "#0b090a", "type": "color", "description": "Deep obsidian canvas" },

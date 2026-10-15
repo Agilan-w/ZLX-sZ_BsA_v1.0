@@ -14,8 +14,8 @@
 
 """ZLX-CDE V2.5 Decision Engine -- RLCD Fine-Tuning Pipeline.
 
-A production-grade pipeline for training calibrated decision heads on top
-of the Laya model (ModernBERT-large encoder) using Reinforcement Learning
+Pipeline for training calibrated decision heads on top of the
+Laya model (ModernBERT-large encoder) using Reinforcement Learning
 for Calibrated Decisions (RLCD).
 """
 

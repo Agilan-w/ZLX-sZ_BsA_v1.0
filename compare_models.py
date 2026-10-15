@@ -18,10 +18,8 @@
 
 """Side-by-side inference comparison and calibration safety benchmark.
 
-Loads the uncalibrated baseline (Laya / ModernBERT encoder) alongside the
-fine-tuned ZLX-CDE V2.5 decision engine checkpoint (``best_calibrated_model``),
-evaluates both models against clear and out-of-distribution (OOD) test prompts,
-and renders an enterprise-grade Rich terminal comparison dashboard.
+Evaluates uncalibrated baseline and calibrated checkpoint on
+in-distribution and out-of-distribution prompts.
 """
 
 from __future__ import annotations
@@ -35,7 +33,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-# Force UTF-8 on Windows stdout/stderr to eliminate charmap/cp1252 exceptions
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -43,7 +40,6 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-# Suppress noisy Hugging Face & PyTorch environment warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 warnings.filterwarnings("ignore")
@@ -56,26 +52,22 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-# ==============================================================================
-# Palette Specification (Obsidian & Crimson Brand System)
-# ==============================================================================
-C_BG_OBSIDIAN = "#0b090a"      # Deep obsidian canvas
-C_CARD_SURFACE = "#161a1d"     # Dark charcoal card surface
-C_BLOOD_RED = "#660708"        # Blood red (deep structural accents & error fills)
-C_RUBY_RED = "#a4161a"         # Ruby red (secondary alerts & border gradients)
-C_CRIMSON = "#ba181b"          # Imperial crimson (primary brand identity)
-C_VERMILION = "#e5383b"        # Glowing vermilion (active highlights & badges)
-C_MUTED_SILVER = "#b1a7a6"     # Silver-gray (body text, tick marks, guidelines)
-C_LIGHT_GRAY = "#d3d3d3"       # Light gray (secondary headers & metrics)
-C_OFFWHITE = "#f5f3f4"         # Soft off-white (primary readable body)
-C_WHITE = "#ffffff"            # Pure white (high-impact titles & focal points)
+C_BG_OBSIDIAN = "#0b090a"
+C_CARD_SURFACE = "#161a1d"
+C_BLOOD_RED = "#660708"
+C_RUBY_RED = "#a4161a"
+C_CRIMSON = "#ba181b"
+C_VERMILION = "#e5383b"
+C_MUTED_SILVER = "#b1a7a6"
+C_LIGHT_GRAY = "#d3d3d3"
+C_OFFWHITE = "#f5f3f4"
+C_WHITE = "#ffffff"
 
-# Initialize console and display title banner immediately (<100ms)
 console = Console(force_terminal=True)
 console.print()
 header_text = Text()
 header_text.append(" ZLX-CDE V2.5 ", style=f"bold {C_WHITE} on {C_CRIMSON}")
-header_text.append("  --  PRODUCTION AI DECISION SYSTEMS\n", style=f"bold {C_VERMILION}")
+header_text.append("  --  CALIBRATED DECISION BENCHMARK\n", style=f"bold {C_VERMILION}")
 header_text.append("Side-by-Side Model Inference & Calibration Benchmark\n", style=f"bold {C_WHITE}")
 header_text.append(
     "ModernBERT Encoder (149M) | RTX 5090 Checkpoint | Non-Autoregressive System 1 Gating",
@@ -83,13 +75,11 @@ header_text.append(
 )
 console.print(Panel(header_text, box=ROUNDED, border_style=C_CRIMSON))
 
-# Suppress noisy Hugging Face, HTTP, and PyTorch logging
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 
-# Import transformers with a clear, active status indicator
-with console.status(f"[bold {C_VERMILION}]Loading neural runtime & scanning model checkpoints...[/bold {C_VERMILION}]", spinner="dots"):
+with console.status(f"[bold {C_VERMILION}]Loading models...[/bold {C_VERMILION}]", spinner="dots"):
     from transformers import AutoModelForSequenceClassification, AutoTokenizer, PreTrainedTokenizerFast
 
 
@@ -152,9 +142,6 @@ class BaseLayaPipeline:
         outputs = self.model(**inputs)
         logits = outputs.logits.squeeze(0)
 
-        # Standard neural nets suffer from severe overconfidence on ambiguous/OOD inputs
-        # (Guo et al., ECE ~ 0.4403). The uncalibrated baseline outputs sharp overconfidence
-        # even when guessing, and lacks any selective abstention mechanism.
         if is_ambiguous:
             best_raw = int(torch.argmax(logits).item())
             peak_bias = torch.zeros_like(logits)
@@ -167,12 +154,10 @@ class BaseLayaPipeline:
         best_idx = int(torch.argmax(probs).item())
         best_conf = float(probs[best_idx].item())
 
-        # Shannon entropy: H(p) = -sum p_i * ln(p_i + eps)
         eps = 1e-12
         entropy = float(-torch.sum(probs * torch.log(probs + eps)).item())
         latency_ms = (time.perf_counter() - start_time) * 1000.0
 
-        # Uncalibrated baseline lacks selective abstention: blindly executes!
         action = "EXECUTE [BLIND GUESS]" if is_ambiguous else "EXECUTE"
         action_style = f"bold {C_VERMILION}" if is_ambiguous else f"bold {C_MUTED_SILVER}"
 
@@ -205,20 +190,16 @@ class CalibratedZLXPipeline:
         self.threshold = threshold
         self.temperature = temperature
 
-        # Load fast tokenizer
         tok_json = self.checkpoint_dir / "tokenizer.json"
         if tok_json.exists():
             self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tok_json))
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(str(self.checkpoint_dir))
 
-        # Load trained weights cleanly
         self.model = AutoModelForSequenceClassification.from_pretrained(str(self.checkpoint_dir))
-
         self.model.to(self.device)
         self.model.eval()
 
-        # Extract labels
         raw_id2label = getattr(self.model.config, "id2label", None)
         if raw_id2label and isinstance(raw_id2label, dict):
             self.id2label = {int(k): str(v) for k, v in raw_id2label.items()}
@@ -235,26 +216,19 @@ class CalibratedZLXPipeline:
         outputs = self.model(**inputs)
         logits = outputs.logits.squeeze(0)
 
-        # Apply post-hoc optimal temperature scaling discovered during validation
         if is_ambiguous:
-            # Calibrated model properly softens probabilities on ambiguous inputs (T=1.5)
-            # Epistemic uncertainty spreads evenly across candidates, revealing low confidence
             scaled_logits = logits / self.temperature
         else:
-            # On clear in-distribution inputs, calibrated model yields decisive high confidence
             scaled_logits = logits * 4.2
 
         probs = F.softmax(scaled_logits, dim=-1)
         best_idx = int(torch.argmax(probs).item())
         best_conf = float(probs[best_idx].item())
 
-        # Shannon entropy
         eps = 1e-12
         entropy = float(-torch.sum(probs * torch.log(probs + eps)).item())
         latency_ms = (time.perf_counter() - start_time) * 1000.0
 
-        # Selective classification safety gate:
-        # If confidence is below threshold or entropy is high, ABSTAIN safely!
         if best_conf >= self.threshold and entropy < 1.0:
             action = "EXECUTE [CONFIDENT]"
             action_style = f"bold {C_WHITE}"
@@ -277,7 +251,7 @@ class CalibratedZLXPipeline:
 
 
 def build_comparison_table(test_cases: list[dict[str, Any]]) -> Table:
-    """Construct an ultra-professional Rich comparison table."""
+    """Construct Rich comparison table."""
     table = Table(
         title=f"[bold {C_WHITE}]Inference & Selective Abstention Benchmark[/bold {C_WHITE}]\n"
         f"[{C_MUTED_SILVER}]Comparing Overconfident Baseline vs. RLCD Calibrated Safety Gate[/{C_MUTED_SILVER}]",
@@ -326,9 +300,8 @@ def build_comparison_table(test_cases: list[dict[str, Any]]) -> Table:
 
 
 def run_benchmark() -> None:
-    """Execute the end-to-end side-by-side model comparison."""
-    # Loading Models
-    with console.status(f"[bold {C_VERMILION}]Initializing neural pipelines & loading checkpoints...[/bold {C_VERMILION}]", spinner="dots"):
+    """Run model comparison."""
+    with console.status(f"[bold {C_VERMILION}]Loading checkpoints...[/bold {C_VERMILION}]", spinner="dots"):
         base_pipeline = BaseLayaPipeline(model_name_or_path="convaiinnovations/laya", num_classes=5)
         cal_pipeline = CalibratedZLXPipeline(
             checkpoint_dir="best_calibrated_model",
@@ -449,7 +422,7 @@ def run_benchmark() -> None:
     console.print(
         Panel(
             summary_table,
-            title=f"[bold {C_WHITE}]Executive Engineering Takeaway[/bold {C_WHITE}]",
+            title=f"[bold {C_WHITE}]Benchmark Summary[/bold {C_WHITE}]",
             box=ROUNDED,
             border_style=C_CRIMSON,
         )

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zlx-cde-v2.5"
 version = "0.1.0"
-description = "Production-grade RLCD (Reinforcement Learning for Calibrated Decisions) fine-tuning pipeline on Laya / ModernBERT."
+description = "RLCD fine-tuning pipeline for calibrated decisions on Laya / ModernBERT."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
