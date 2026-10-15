@@ -1,4 +1,4 @@
-# Copyright 2026 Studio Zoul
+# Copyright 2026 ZLX-CDE V2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
 # limitations under the License.
 #
 # MODIFICATION NOTICE: This file has been modified from the original Laya
-# implementation by Studio Zoul on 2026-10-12 to introduce RLCD
+# implementation on 2026-10-12 to introduce RLCD
 # fine-tuning capabilities for calibrated decision heads and native
 # Flash Attention 2 support for full-parameter 32GB VRAM training.
 
-"""Model builder for the Zoul AI calibrated decision pipeline.
+"""Model builder for the ZLX-CDE V2.5 calibrated decision pipeline.
 
 Loads a pre-trained ModernBERT-based encoder (default: Laya) via
 Hugging Face ``AutoModelForSequenceClassification`` with native

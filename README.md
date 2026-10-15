@@ -1,4 +1,4 @@
-# Zoul AI Decision Engine
+# ZLX-CDE V2.5 Decision Engine
 
 **RLCD Fine-Tuning Pipeline for Calibrated Decision Heads**
 
@@ -34,8 +34,8 @@ The Brier Score is a strictly proper scoring rule — the model minimises it onl
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/zoul-ai-decision-engine.git
-cd zoul-ai-decision-engine
+git clone https://github.com/your-org/zlx-cde-v2.5.git
+cd zlx-cde-v2.5
 
 # Create virtual environment
 python -m venv .venv
@@ -119,7 +119,7 @@ Input Tokens → [ModernBERT Encoder] → [Classification Head] → Logits
 | `--max_length` | `1024` | Sequence length threshold (RTX 5090 default: 1024) |
 | `--val_split` | `0.2` | Validation split fraction |
 | `--use_wandb` | `False` | Enable Weights & Biases (wandb) experiment tracking |
-| `--wandb_project` | `zoul-ai-decision-engine` | Weights & Biases project name |
+| `--wandb_project` | `zlx-cde-v2.5` | Weights & Biases project name |
 | `--wandb_run_name` | `None` | Optional run name for Weights & Biases |
 | `--output_dir` | `best_calibrated_model` | Checkpoint directory |
 | `--seed` | `42` | Random seed |
@@ -300,7 +300,7 @@ This software is provided **"AS IS"**, WITHOUT WARRANTIES OR CONDITIONS OF ANY K
 
 This project is built upon the **Laya** model by [Convai Innovations](https://convaiinnovations.com) (Copyright 2026 Nandakishor Mukkunnoth / Convai Innovations) and the **ModernBERT** architecture by [Answer.AI](https://huggingface.co/answerdotai/ModernBERT-large) and collaborators. See the [`NOTICE`](NOTICE) file for complete attribution details.
 
-This is an **independent derivative work**. "Zoul AI Decision Engine" does not claim endorsement from, or affiliation with, the original Laya or ModernBERT creators. "Laya" is a trademark of Convai Innovations and is used here solely to identify the upstream model for transparency and compliance with Apache 2.0 Section 6.
+This is an **independent derivative work**. "ZLX-CDE V2.5 Decision Engine" does not claim endorsement from, or affiliation with, the original Laya or ModernBERT creators. "Laya" is a trademark of Convai Innovations and is used here solely to identify the upstream model for transparency and compliance with Apache 2.0 Section 6.
 
 ### Modification Notices
 
@@ -313,14 +313,14 @@ Per Apache 2.0 Section 4(b), files that directly wrap, modify, or derive from or
 If you use this pipeline in your research, please cite:
 
 ```bibtex
-@software{zoul_rlcd_2026,
-    title  = {Zoul AI Decision Engine: RLCD Fine-Tuning Pipeline},
-    author = {Studio Zoul},
+@software{zlx_cde_v2_5_2026,
+    title  = {ZLX-CDE V2.5 Decision Engine: RLCD Fine-Tuning Pipeline},
+    author = {ZLX-CDE V2.5},
     year   = {2026},
-    url    = {https://github.com/your-org/zoul-ai-decision-engine},
+    url    = {https://github.com/your-org/zlx-cde-v2.5},
 }
 ```
 
 ---
 
-*Built with ❤ by Studio Zoul*
+*Built with ❤ by ZLX-CDE V2.5*

@@ -1,4 +1,4 @@
-# Copyright 2026 Studio Zoul
+# Copyright 2026 ZLX-CDE V2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# MODIFICATION NOTICE: This file has been created by Studio Zoul on 2026-10-12
+# MODIFICATION NOTICE: This file has been created on 2026-10-12
 # to serve calibrated decision predictions with selective classification.
 
 """Production inference engine and calibrated decision scorer.
@@ -241,7 +241,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="zoul_rlcd.predict",
         description=(
-            "Zoul AI Decision Engine -- Calibrated inference scorer and "
+            "ZLX-CDE V2.5 Decision Engine -- Calibrated inference scorer and "
             "selective classification CLI tool. Outputs strict JSON."
         ),
     )

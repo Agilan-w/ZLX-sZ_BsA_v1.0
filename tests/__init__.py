@@ -1,4 +1,4 @@
-# Copyright 2026 Studio Zoul
+# Copyright 2026 ZLX-CDE V2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test suite for the Zoul AI Decision Engine (RLCD)."""
+"""Test suite for the ZLX-CDE V2.5 Decision Engine (RLCD)."""

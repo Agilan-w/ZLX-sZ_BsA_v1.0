@@ -1,0 +1,54 @@
+{
+  "$schema": "https://tr.designtokens.org/format/",
+  "name": "ZLX-CDE V2.5 Brand Design Tokens",
+  "version": "1.0.0",
+  "description": "Obsidian & Crimson 10-Color Enterprise Design System for ZLX-CDE V2.5 Decision Engine",
+  "primitive": {
+    "color": {
+      "obsidian": { "value": "#0b090a", "type": "color", "description": "Deep obsidian canvas" },
+      "charcoal": { "value": "#161a1d", "type": "color", "description": "Dark charcoal card surface" },
+      "bloodRed": { "value": "#660708", "type": "color", "description": "Blood red structural accents" },
+      "rubyRed": { "value": "#a4161a", "type": "color", "description": "Ruby red secondary alerts" },
+      "crimson": { "value": "#ba181b", "type": "color", "description": "Imperial crimson primary brand" },
+      "vermilion": { "value": "#e5383b", "type": "color", "description": "Glowing vermilion highlights & badges" },
+      "silver": { "value": "#b1a7a6", "type": "color", "description": "Muted silver secondary copy" },
+      "lightGray": { "value": "#d3d3d3", "type": "color", "description": "Light gray headers & metrics" },
+      "offWhite": { "value": "#f5f3f4", "type": "color", "description": "Soft off-white readable text" },
+      "pureWhite": { "value": "#ffffff", "type": "color", "description": "Pure white high-contrast headers" }
+    }
+  },
+  "semantic": {
+    "color": {
+      "bg-canvas": { "value": "{primitive.color.obsidian}", "type": "color" },
+      "surface-card": { "value": "{primitive.color.charcoal}", "type": "color" },
+      "border-subtle": { "value": "{primitive.color.bloodRed}", "type": "color" },
+      "border-accent": { "value": "{primitive.color.rubyRed}", "type": "color" },
+      "brand-primary": { "value": "{primitive.color.crimson}", "type": "color" },
+      "brand-highlight": { "value": "{primitive.color.vermilion}", "type": "color" },
+      "text-muted": { "value": "{primitive.color.silver}", "type": "color" },
+      "text-secondary": { "value": "{primitive.color.lightGray}", "type": "color" },
+      "text-primary": { "value": "{primitive.color.offWhite}", "type": "color" },
+      "text-heading": { "value": "{primitive.color.pureWhite}", "type": "color" },
+      "status-risk": { "value": "{primitive.color.vermilion}", "type": "color" },
+      "status-pass": { "value": "{primitive.color.pureWhite}", "type": "color" },
+      "status-abstain": { "value": "{primitive.color.vermilion}", "type": "color" }
+    }
+  },
+  "component": {
+    "badge": {
+      "bg": { "value": "{semantic.color.surface-card}", "type": "color" },
+      "border": { "value": "{semantic.color.brand-primary}", "type": "color" },
+      "text": { "value": "{semantic.color.brand-highlight}", "type": "color" }
+    },
+    "panel": {
+      "bg": { "value": "{semantic.color.surface-card}", "type": "color" },
+      "border": { "value": "{semantic.color.border-subtle}", "type": "color" },
+      "title": { "value": "{semantic.color.text-heading}", "type": "color" }
+    },
+    "kpi": {
+      "metric": { "value": "{semantic.color.brand-highlight}", "type": "color" },
+      "label": { "value": "{semantic.color.text-heading}", "type": "color" },
+      "sub": { "value": "{semantic.color.text-muted}", "type": "color" }
+    }
+  }
+}

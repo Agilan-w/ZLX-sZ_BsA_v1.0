@@ -1,4 +1,4 @@
-# Copyright 2026 Studio Zoul
+# Copyright 2026 ZLX-CDE V2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="zoul_rlcd.evaluate",
         description=(
-            "Zoul AI Decision Engine -- Checkpoint evaluation, post-hoc "
+            "ZLX-CDE V2.5 Decision Engine -- Checkpoint evaluation, post-hoc "
             "temperature scaling, and reliability diagram generator."
         ),
     )
@@ -331,7 +331,7 @@ def plot_reliability_diagrams(
         )
         ax.legend(loc="lower right", framealpha=0.95, edgecolor="#E2E8F0")
 
-    plt.suptitle("Zoul AI Decision Engine -- Calibration Reliability Analysis", fontsize=15, fontweight="bold", y=0.98)
+    plt.suptitle("ZLX-CDE V2.5 Decision Engine -- Calibration Reliability Analysis", fontsize=15, fontweight="bold", y=0.98)
     plt.tight_layout()
 
     out_file = Path(output_path)
@@ -352,7 +352,7 @@ def print_comparison_table(
     nll_diff = post_metrics["nll"] - pre_metrics["nll"]
 
     print("\n" + "=" * 76)
-    print("           ZOUL AI DECISION ENGINE -- CALIBRATION EVALUATION REPORT")
+    print("           ZLX-CDE V2.5 DECISION ENGINE -- CALIBRATION EVALUATION REPORT")
     print("=" * 76)
     print(f" {'Metric':<28} | {'Before Scaling':<18} | {'After Scaling (T=' + f'{optimal_t:.3f})':<22}")
     print("-" * 76)

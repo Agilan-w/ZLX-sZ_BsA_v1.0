@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "zoul-ai-decision-engine"
+name = "zlx-cde-v2.5"
 version = "0.1.0"
 description = "Production-grade RLCD (Reinforcement Learning for Calibrated Decisions) fine-tuning pipeline on Laya / ModernBERT."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Studio Zoul" },
+    { name = "ZLX-CDE V2.5" },
 ]
 keywords = [
     "deep-learning",
@@ -58,9 +58,9 @@ test = [
 ]
 
 [project.scripts]
-zoul-train = "zoul_rlcd.train:main"
-zoul-evaluate = "zoul_rlcd.evaluate:main"
-zoul-predict = "zoul_rlcd.predict:main"
+zlx-train = "zoul_rlcd.train:main"
+zlx-evaluate = "zoul_rlcd.evaluate:main"
+zlx-predict = "zoul_rlcd.predict:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

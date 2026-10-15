@@ -1,0 +1,45 @@
+/**
+ * ZLX-CDE V2.5 Design System Tokens
+ * 10-Color Palette: Obsidian & Crimson Brand Pipeline
+ * ["#0b090a", "#161a1d", "#660708", "#a4161a", "#ba181b", "#e5383b", "#b1a7a6", "#d3d3d3", "#f5f3f4", "#ffffff"]
+ */
+
+:root {
+  /* Primitive Tokens (Layer 1) */
+  --obsidian-950: #0b090a;
+  --charcoal-900: #161a1d;
+  --blood-red-800: #660708;
+  --ruby-red-700: #a4161a;
+  --crimson-600: #ba181b;
+  --vermilion-500: #e5383b;
+  --silver-400: #b1a7a6;
+  --gray-300: #d3d3d3;
+  --offwhite-100: #f5f3f4;
+  --white-50: #ffffff;
+
+  /* Semantic Tokens (Layer 2) */
+  --color-canvas: var(--obsidian-950);
+  --color-surface: var(--charcoal-900);
+  --color-surface-hover: #1f2428;
+  --color-border-subtle: var(--blood-red-800);
+  --color-border-accent: var(--ruby-red-700);
+  --color-brand-primary: var(--crimson-600);
+  --color-brand-highlight: var(--vermilion-500);
+  --color-text-muted: var(--silver-400);
+  --color-text-secondary: var(--gray-300);
+  --color-text-primary: var(--offwhite-100);
+  --color-text-heading: var(--white-50);
+  --color-status-danger: var(--vermilion-500);
+  --color-status-pass: var(--white-50);
+  --color-status-abstain: var(--vermilion-500);
+
+  /* Component Tokens (Layer 3) */
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-border-subtle);
+  --badge-bg: var(--color-surface);
+  --badge-border: var(--color-brand-primary);
+  --badge-text: var(--color-brand-highlight);
+  --btn-primary-bg: var(--color-brand-primary);
+  --btn-primary-hover: var(--color-brand-highlight);
+  --btn-primary-text: var(--color-text-heading);
+}

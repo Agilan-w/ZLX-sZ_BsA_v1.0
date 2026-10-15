@@ -1,4 +1,4 @@
-# Copyright 2026 Studio Zoul
+# Copyright 2026 ZLX-CDE V2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
 # limitations under the License.
 #
 # MODIFICATION NOTICE: This file has been modified from the original Laya
-# implementation by Studio Zoul on 2026-10-12 to introduce RLCD
+# implementation on 2026-10-12 to introduce RLCD
 # fine-tuning capabilities for calibrated decision heads, differential
 # learning rates, native Weights & Biases (wandb) logging, and high-throughput
 # 32GB VRAM optimization (RTX 5090).
 
-"""RLCD training orchestrator for the Zoul AI Decision Engine.
+"""RLCD training orchestrator for the ZLX-CDE V2.5 Decision Engine.
 
 Manages the full training and validation lifecycle optimized for full-parameter
 training on 32GB VRAM hardware (such as RTX 5090):
@@ -89,7 +89,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="zoul_rlcd.train",
         description=(
-            "Zoul AI Decision Engine -- RLCD fine-tuning pipeline for "
+            "ZLX-CDE V2.5 Decision Engine -- RLCD fine-tuning pipeline for "
             "calibrated decision heads on top of the Laya model (RTX 5090 optimized)."
         ),
     )
@@ -229,8 +229,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--wandb_project",
         type=str,
-        default="zoul-ai-decision-engine",
-        help="Weights & Biases project name (default: zoul-ai-decision-engine).",
+        default="zlx-cde-v2.5",
+        help="Weights & Biases project name (default: zlx-cde-v2.5).",
     )
     parser.add_argument(
         "--wandb_run_name",

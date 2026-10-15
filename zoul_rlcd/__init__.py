@@ -1,4 +1,4 @@
-# Copyright 2026 Studio Zoul
+# Copyright 2026 ZLX-CDE V2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Zoul AI Decision Engine -- RLCD Fine-Tuning Pipeline.
+"""ZLX-CDE V2.5 Decision Engine -- RLCD Fine-Tuning Pipeline.
 
 A production-grade pipeline for training calibrated decision heads on top
 of the Laya model (ModernBERT-large encoder) using Reinforcement Learning
@@ -21,8 +21,16 @@ for Calibrated Decisions (RLCD).
 
 __version__ = "0.1.0"
 
-from zoul_rlcd.data_loader import load_decision_dataset
-from zoul_rlcd.dataset import SyntheticDecisionDataset
+try:
+    from zoul_rlcd.data_loader import load_decision_dataset
+except (ImportError, Exception):
+    load_decision_dataset = None  # type: ignore
+
+try:
+    from zoul_rlcd.dataset import SyntheticDecisionDataset
+except (ImportError, Exception):
+    SyntheticDecisionDataset = None  # type: ignore
+
 from zoul_rlcd.metrics import CalibrationTracker
 from zoul_rlcd.model import build_calibrated_decision_model
 from zoul_rlcd.rlcd_loss import BrierScoreLoss, RLCDCompoundLoss
